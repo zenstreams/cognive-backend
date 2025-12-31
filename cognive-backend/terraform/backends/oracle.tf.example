@@ -1,0 +1,114 @@
+# =============================================================================
+# Oracle Cloud Always Free Backend Configuration
+# =============================================================================
+# Use this backend for Oracle Cloud deployments.
+# State is stored in Oracle Cloud Object Storage (S3-compatible).
+#
+# Oracle Cloud Always Free Tier includes:
+# - 10GB Object Storage (free forever)
+# - Perfect for Terraform state storage
+# =============================================================================
+
+# terraform {
+#   backend "s3" {
+#     # Oracle Object Storage bucket
+#     bucket = "cognive-terraform-state"
+#     
+#     # Path within bucket
+#     key = "production/terraform.tfstate"
+#     
+#     # Required but not meaningful for OCI
+#     region = "us-ashburn-1"
+#     
+#     # Oracle Object Storage S3-compatible endpoint
+#     # Format: https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+#     endpoint = "https://your-namespace.compat.objectstorage.us-ashburn-1.oraclecloud.com"
+#     
+#     # OCI-specific settings
+#     skip_credentials_validation = true
+#     skip_metadata_api_check     = true
+#     skip_region_validation      = true
+#     force_path_style            = true
+#   }
+# }
+
+# =============================================================================
+# Setting Up Oracle Cloud Backend
+# =============================================================================
+#
+# 1. Create a Bucket in Oracle Cloud:
+#    - Go to OCI Console > Storage > Object Storage
+#    - Create a bucket named "cognive-terraform-state"
+#    - Note your namespace (shown in bucket details)
+#
+# 2. Create Customer Secret Keys:
+#    - Go to OCI Console > Identity > Users > Your User
+#    - Under "Resources", click "Customer Secret Keys"
+#    - Generate a new key pair
+#    - Save the Access Key and Secret Key
+#
+# 3. Set Environment Variables:
+#    export AWS_ACCESS_KEY_ID="<your-access-key>"
+#    export AWS_SECRET_ACCESS_KEY="<your-secret-key>"
+#
+# 4. Find Your Namespace:
+#    - Go to OCI Console > Administration > Tenancy Details
+#    - Copy the "Object Storage Namespace"
+#
+# 5. Construct the Endpoint:
+#    https://<namespace>.compat.objectstorage.<region>.oraclecloud.com
+#    
+#    Example regions:
+#    - us-ashburn-1 (US East)
+#    - us-phoenix-1 (US West)
+#    - eu-frankfurt-1 (Germany)
+#    - ap-tokyo-1 (Japan)
+#
+# =============================================================================
+# Oracle Cloud Terraform Provider (for provisioning OCI resources)
+# =============================================================================
+#
+# If you want to provision Oracle Cloud resources with Terraform:
+#
+# terraform {
+#   required_providers {
+#     oci = {
+#       source  = "oracle/oci"
+#       version = "~> 5.0"
+#     }
+#   }
+# }
+#
+# provider "oci" {
+#   tenancy_ocid     = var.tenancy_ocid
+#   user_ocid        = var.user_ocid
+#   fingerprint      = var.fingerprint
+#   private_key_path = var.private_key_path
+#   region           = var.region
+# }
+#
+# # Oracle Cloud Always Free Compute Instance
+# resource "oci_core_instance" "cognive_server" {
+#   availability_domain = var.availability_domain
+#   compartment_id      = var.compartment_id
+#   shape               = "VM.Standard.A1.Flex"  # ARM-based (Always Free!)
+#   
+#   shape_config {
+#     memory_in_gbs = 24  # Up to 24GB free
+#     ocpus         = 4   # Up to 4 cores free
+#   }
+#   
+#   source_details {
+#     source_type = "image"
+#     source_id   = var.ubuntu_image_id  # Ubuntu 22.04 ARM
+#   }
+#   
+#   display_name = "cognive-control-plane"
+#   
+#   metadata = {
+#     ssh_authorized_keys = var.ssh_public_key
+#   }
+# }
+#
+# =============================================================================
+

@@ -1,0 +1,31 @@
+# =============================================================================
+# Development Environment - Example Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in the values.
+# DO NOT commit terraform.tfvars to version control!
+# =============================================================================
+
+# Docker
+docker_host = "unix:///var/run/docker.sock"
+
+# PostgreSQL
+postgres_user     = "cognive"
+postgres_password = "dev_postgres_password_change_me"
+postgres_db       = "cognive"
+
+# Redis (optional password for dev)
+redis_password = ""
+
+# RabbitMQ
+rabbitmq_user     = "cognive"
+rabbitmq_password = "dev_rabbitmq_password_change_me"
+
+# MinIO
+minio_root_user     = "cognive"
+minio_root_password = "dev_minio_password_change_me"  # Min 8 characters
+
+# Monitoring
+enable_monitoring      = true
+grafana_admin_user     = "admin"
+grafana_admin_password = "admin"
+

@@ -1,0 +1,154 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ${ENV_FILE:-.env}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - minio
+    volumes:
+      - ./:/app
+    command: sh -c "pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-replication.sh:/docker-entrypoint-initdb.d/init-replication.sh
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb,pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=256MB
+      - -c
+      - hot_standby=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres_replica_1:
+    image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
+    user: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGUSER: replicator
+      PGPASSWORD: ${POSTGRES_REPL_PASSWORD:-replica_pass}
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_replica_1_data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+      if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+        echo 'Initializing replica from primary...' &&
+        until pg_isready -h postgres -p 5432; do echo 'Waiting for primary...'; sleep 2; done &&
+        rm -rf /var/lib/postgresql/data/* &&
+        PGPASSWORD=$${PGPASSWORD} pg_basebackup -h postgres -D /var/lib/postgresql/data -U replicator -Fp -Xs -P -R &&
+        chmod 700 /var/lib/postgresql/data;
+      fi &&
+      exec postgres -c hot_standby=on -c shared_preload_libraries=timescaledb
+      "
+
+  postgres_replica_2:
+    image: timescale/timescaledb:latest-pg15
+    restart: unless-stopped
+    user: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGUSER: replicator
+      PGPASSWORD: ${POSTGRES_REPL_PASSWORD:-replica_pass}
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_replica_2_data:/var/lib/postgresql/data
+    command: >
+      bash -c "
+      if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+        echo 'Initializing replica from primary...' &&
+        until pg_isready -h postgres -p 5432; do echo 'Waiting for primary...'; sleep 2; done &&
+        rm -rf /var/lib/postgresql/data/* &&
+        PGPASSWORD=$${PGPASSWORD} pg_basebackup -h postgres -D /var/lib/postgresql/data -U replicator -Fp -Xs -P -R &&
+        chmod 700 /var/lib/postgresql/data;
+      fi &&
+      exec postgres -c hot_standby=on -c shared_preload_libraries=timescaledb
+      "
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 4gb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    ports:
+      # Remapped to avoid host port 9000 collision (MinIO API now on 9002, console on 9003)
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  postgres_replica_1_data:
+  postgres_replica_2_data:
+  redis_data:
+  minio_data:
+

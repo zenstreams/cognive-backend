@@ -1,0 +1,33 @@
+# =============================================================================
+# Oracle Cloud Always Free - Example Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in secure values.
+# DO NOT commit terraform.tfvars to version control!
+#
+# Recommended: Use strong passwords (16+ characters) for production.
+# =============================================================================
+
+# Docker
+docker_host = "unix:///var/run/docker.sock"
+
+# PostgreSQL (use strong passwords!)
+postgres_user                 = "cognive"
+postgres_password             = "CHANGE_ME_strong_password_16chars"
+postgres_db                   = "cognive"
+postgres_replication_password = "CHANGE_ME_replication_password"
+
+# Redis
+redis_password = "CHANGE_ME_redis_password_16chars"
+
+# RabbitMQ
+rabbitmq_user     = "cognive"
+rabbitmq_password = "CHANGE_ME_rabbitmq_password"
+
+# MinIO (min 8 characters)
+minio_root_user     = "cognive"
+minio_root_password = "CHANGE_ME_minio_password"
+
+# Grafana
+grafana_admin_user     = "admin"
+grafana_admin_password = "CHANGE_ME_grafana_password"
+
