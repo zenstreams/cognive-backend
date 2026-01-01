@@ -4,7 +4,12 @@ set -e
 # Create replication user for PostgreSQL streaming replication
 # This script runs on the primary during first initialization
 
-REPL_PASSWORD="${POSTGRES_REPL_PASSWORD}"
+REPL_PASSWORD="${POSTGRES_REPL_PASSWORD:-replica_pass}"
+
+if [[ -z "${REPL_PASSWORD}" ]]; then
+  echo "ERROR: POSTGRES_REPL_PASSWORD is empty. Set POSTGRES_REPL_PASSWORD in your env file."
+  exit 1
+fi
 
 echo "Creating replication user 'replicator'..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
