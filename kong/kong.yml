@@ -1,0 +1,32 @@
+_format_version: "3.0"
+_transform: true
+
+# Cognive local API gateway (Kong, DB-less)
+#
+# Exposes:
+# - /v1/*  -> http://api:8000/api/v1/*
+# - /v2/*  -> http://api:8000/api/v1/*  (alias for now; keeps clients versioned)
+#
+# NOTE: This is intended for local/dev only.
+
+services:
+  - name: cognive-api
+    url: http://api:8000/api/v1
+    routes:
+      - name: cognive-v1
+        paths:
+          - /v1
+        strip_path: true
+      - name: cognive-v2
+        paths:
+          - /v2
+        strip_path: true
+    plugins:
+      - name: rate-limiting
+        config:
+          policy: local
+          limit_by: ip
+          minute: 60
+          fault_tolerant: true
+
+

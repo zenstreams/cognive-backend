@@ -102,6 +102,9 @@ override.tf.json
 *.seed
 *.pid.lock
 
+# Local dev artifacts (certs, etc.)
+.local/
+
 # OS
 .DS_Store
 .DS_Store?

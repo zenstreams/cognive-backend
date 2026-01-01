@@ -26,6 +26,12 @@ bash "${ROOT_DIR}/scripts/ensure_postgres_replication.sh"
 echo "[dev-up] Starting replicas + API..."
 docker compose up -d postgres_replica_1 postgres_replica_2 api
 
+echo "[dev-up] Ensuring local Kong TLS certs..."
+bash "${ROOT_DIR}/scripts/generate_local_kong_tls.sh"
+
+echo "[dev-up] Starting Kong API gateway..."
+docker compose up -d kong
+
 echo "[dev-up] Current status:"
 docker compose ps
 

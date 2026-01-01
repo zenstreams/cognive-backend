@@ -7,23 +7,45 @@ FastAPI-based backend aligned with the control plane architecture. This folder c
    ```bash
    cp env.example .env
    ```
-2. Build and run the stack:
+2. Bootstrap local dev (starts deps, replicas, API, and Kong gateway with local TLS):
    ```bash
-   docker-compose up --build
+   ./scripts/dev-up.sh
    ```
 3. Verify health:
-   - Liveness: http://localhost:8000/api/v1/health/liveness
-   - Readiness: http://localhost:8000/api/v1/health/readiness
-   - Replication: http://localhost:8000/api/v1/health/replication
-4. API docs: http://localhost:8000/docs
+   - Via gateway (HTTP): http://localhost:8000/v1/health/liveness
+   - Via gateway (HTTPS): https://localhost:8443/v1/health/liveness
+   - Direct API (debug): http://localhost:8002/api/v1/health/liveness
+4. API docs:
+   - Via gateway (HTTP): http://localhost:8000/v1/docs
+   - Direct API (debug): http://localhost:8002/docs
 
 ## Services (docker-compose)
 - FastAPI API (`api`)
+- Kong API Gateway (DB-less) (`kong`)
 - PostgreSQL 15 / TimescaleDB primary (`postgres`)
 - PostgreSQL read replicas (`postgres_replica_1`, `postgres_replica_2`)
 - Redis 7 (`redis`)
 - RabbitMQ with management UI (`rabbitmq`, UI at http://localhost:15672)
 - MinIO object storage (`minio`, console at http://localhost:9003)
+
+## API Gateway (Kong) (SCRUM-87)
+- **Gateway HTTP**: `http://localhost:8000`
+- **Gateway HTTPS**: `https://localhost:8443` (self-signed cert generated under `.local/`)
+- **Admin API (localhost-only)**: `http://127.0.0.1:8001`
+- **API versioning**: `/v1/*` and `/v2/*` are supported at the gateway (currently both route to the app’s `/api/v1/*`)
+
+### Rate limiting (local)
+Kong rate limiting is enabled with a simple local policy (per-client-IP).
+
+Example (should return `200` until the limit is exceeded, then `429`):
+```bash
+curl -i http://localhost:8000/v1/health/liveness
+```
+
+HTTPS example (self-signed; `-k` skips trust validation):
+```bash
+curl -k -i https://localhost:8443/v1/health/liveness
+```
 
 ## Tech stack
 - Python 3.11, FastAPI, Pydantic v2, SQLAlchemy 2.x
