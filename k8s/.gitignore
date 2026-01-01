@@ -1,0 +1,10 @@
+# Ignore actual secrets
+secrets/secrets.yaml
+
+# Ignore generated kubectl configs
+*.kubeconfig
+
+# Ignore logs
+*.log
+
+

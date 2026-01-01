@@ -1,0 +1,80 @@
+---
+# RoleBinding for Cognive API
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cognive-api-binding
+  namespace: cognive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cognive-api-role
+subjects:
+  - kind: ServiceAccount
+    name: cognive-api
+    namespace: cognive
+
+---
+# RoleBinding for Celery Workers
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cognive-celery-binding
+  namespace: cognive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cognive-celery-role
+subjects:
+  - kind: ServiceAccount
+    name: cognive-celery
+    namespace: cognive
+
+---
+# RoleBinding for Monitoring (namespace-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cognive-monitoring-binding
+  namespace: cognive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cognive-monitoring-role
+subjects:
+  - kind: ServiceAccount
+    name: cognive-monitoring
+    namespace: cognive
+
+---
+# ClusterRoleBinding for Monitoring (cluster-wide metrics)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cognive-monitoring-cluster-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cognive-monitoring-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: cognive-monitoring
+    namespace: cognive
+
+---
+# RoleBinding for Admin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cognive-admin-binding
+  namespace: cognive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cognive-admin-role
+subjects:
+  - kind: ServiceAccount
+    name: cognive-admin
+    namespace: cognive
+
+

@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cognive
+  labels:
+    app.kubernetes.io/name: cognive
+    app.kubernetes.io/component: control-plane
+    app.kubernetes.io/managed-by: kubectl
+
+

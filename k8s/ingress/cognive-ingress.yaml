@@ -1,0 +1,147 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cognive-api-ingress
+  namespace: cognive
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: cognive-ratelimit@kubernetescrd
+  labels:
+    app: cognive
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - api.yourdomain.com
+      secretName: api-tls-cert
+  rules:
+    - host: api.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cognive-api
+                port:
+                  number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cognive-dashboard-ingress
+  namespace: cognive
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+  labels:
+    app: cognive
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - dashboard.yourdomain.com
+      secretName: dashboard-tls-cert
+  rules:
+    - host: dashboard.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cognive-dashboard
+                port:
+                  number: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cognive-flower-ingress
+  namespace: cognive
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: cognive-basicauth@kubernetescrd
+  labels:
+    app: cognive
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - flower.yourdomain.com
+      secretName: flower-tls-cert
+  rules:
+    - host: flower.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cognive-flower
+                port:
+                  number: 5555
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cognive-minio-ingress
+  namespace: cognive
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+  labels:
+    app: cognive
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - minio.yourdomain.com
+      secretName: minio-tls-cert
+  rules:
+    - host: minio.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9001
+
+---
+# Rate Limiting Middleware
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: ratelimit
+  namespace: cognive
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+    period: 1s
+
+---
+# Basic Auth Middleware for Flower
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: basicauth
+  namespace: cognive
+spec:
+  basicAuth:
+    secret: flower-auth
+
+
