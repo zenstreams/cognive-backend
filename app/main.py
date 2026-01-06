@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.api.health import router as health_router
 from app.core.config import settings
+from app.core.messaging import setup_all_queues
 from app.core.storage import init_storage
 
 # =============================================================================
@@ -234,6 +235,26 @@ async def startup_event():
         logger.error(f"❌ Failed to initialize storage: {e}")
         # Don't fail startup if storage is unavailable (graceful degradation)
         logger.warning("⚠️  Continuing without object storage")
+
+    # Ensure RabbitMQ queues/exchanges/DLQs exist
+    try:
+        logger.info("Ensuring message queues are provisioned...")
+        loop = None
+        try:
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            await loop.run_in_executor(None, setup_all_queues)
+        else:  # pragma: no cover - defensive fallback
+            setup_all_queues()
+        logger.info("✅ Message queues ready")
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"❌ Failed to provision message queues: {e}")
+        logger.warning("⚠️  Continuing without queue provisioning")
     
     logger.info("✅ Application startup complete")
 

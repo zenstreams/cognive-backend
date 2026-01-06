@@ -273,3 +273,7 @@ kubectl exec -i -n cognive postgres-0 -- \
 - [Tech Stack](../cognive-docs/TECH_STACK.md)
 
 
+
+
+
+
