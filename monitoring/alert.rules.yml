@@ -1,0 +1,344 @@
+# Prometheus Alerting Rules for Cognive Control Plane
+# These rules define conditions that trigger alerts
+
+groups:
+  # ==========================================================================
+  # API Health Alerts
+  # ==========================================================================
+  - name: cognive_api_alerts
+    interval: 30s
+    rules:
+      - alert: APIDown
+        expr: up{job="cognive-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Cognive API is down"
+          description: "API instance {{ $labels.instance }} has been down for more than 2 minutes"
+          runbook_url: "https://docs.cognive.io/runbooks/api-down"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(cognive_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(cognive_http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High API error rate (> 5%)"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(cognive_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: TooManyOpenConnections
+        expr: cognive_http_requests_inprogress > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Too many concurrent requests"
+          description: "{{ $value }} requests in progress"
+
+  # ==========================================================================
+  # Database Alerts
+  # ==========================================================================
+  - name: cognive_database_alerts
+    interval: 30s
+    rules:
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "Database has been down for more than 1 minute"
+
+      - alert: DatabaseConnectionPoolHigh
+        expr: |
+          pg_stat_database_numbackends{datname="cognive"} 
+          / 
+          pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Database connection pool usage high"
+          description: "Connection pool usage is {{ $value | humanizePercentage }}"
+
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Database replication lag detected"
+          description: "Replication lag is {{ $value }}s"
+
+      - alert: SlowQueries
+        expr: |
+          rate(pg_stat_statements_seconds_total[5m]) 
+          / 
+          rate(pg_stat_statements_calls_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query time is {{ $value }}s"
+
+  # ==========================================================================
+  # Cache (Redis) Alerts
+  # ==========================================================================
+  - name: cognive_cache_alerts
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Redis memory usage high (> 90%)"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighCacheMissRate
+        expr: |
+          rate(cognive_cache_misses_total[5m]) 
+          / 
+          (rate(cognive_cache_hits_total[5m]) + rate(cognive_cache_misses_total[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High cache miss rate (> 50%)"
+          description: "Cache miss rate is {{ $value | humanizePercentage }}"
+
+  # ==========================================================================
+  # Message Queue (RabbitMQ) Alerts
+  # ==========================================================================
+  - name: cognive_mq_alerts
+    interval: 30s
+    rules:
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ has been down for more than 1 minute"
+
+      - alert: QueueBacklog
+        expr: rabbitmq_queue_messages > 1000
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Message queue backlog detected"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages pending"
+
+      - alert: HighMessageFailureRate
+        expr: |
+          rate(cognive_mq_messages_failed_total[5m]) 
+          / 
+          rate(cognive_mq_messages_consumed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High message failure rate (> 10%)"
+          description: "Failure rate is {{ $value | humanizePercentage }}"
+
+  # ==========================================================================
+  # Agent Execution Alerts
+  # ==========================================================================
+  - name: cognive_agent_alerts
+    interval: 30s
+    rules:
+      - alert: HighAgentFailureRate
+        expr: |
+          sum(rate(cognive_agent_runs_total{status="failed"}[5m])) 
+          / 
+          sum(rate(cognive_agent_runs_total[5m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          team: ai-ops
+        annotations:
+          summary: "High agent failure rate (> 20%)"
+          description: "Agent failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: LongRunningAgent
+        expr: cognive_active_agent_runs > 0 and cognive_agent_run_duration_seconds > 600
+        for: 10m
+        labels:
+          severity: warning
+          team: ai-ops
+        annotations:
+          summary: "Long-running agent detected"
+          description: "Agent {{ $labels.agent_id }} has been running for over 10 minutes"
+
+      - alert: HighLLMErrorRate
+        expr: |
+          sum(rate(cognive_llm_calls_total{status="error"}[5m])) 
+          / 
+          sum(rate(cognive_llm_calls_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: ai-ops
+        annotations:
+          summary: "High LLM API error rate (> 10%)"
+          description: "LLM error rate is {{ $value | humanizePercentage }}"
+
+  # ==========================================================================
+  # Cost & Budget Alerts
+  # ==========================================================================
+  - name: cognive_cost_alerts
+    interval: 60s
+    rules:
+      - alert: BudgetNearlyExhausted
+        expr: cognive_budget_remaining_usd < 10
+        for: 5m
+        labels:
+          severity: warning
+          team: finance
+        annotations:
+          summary: "Budget nearly exhausted"
+          description: "Tenant {{ $labels.tenant_id }} has only ${{ $value }} remaining"
+
+      - alert: UnusualSpendingSpike
+        expr: |
+          rate(cognive_cost_total_usd[1h]) > 2 * avg_over_time(rate(cognive_cost_total_usd[24h])[7d:1h])
+        for: 30m
+        labels:
+          severity: warning
+          team: finance
+        annotations:
+          summary: "Unusual spending spike detected"
+          description: "Current hourly spend is 2x higher than 7-day average"
+
+  # ==========================================================================
+  # Infrastructure Alerts
+  # ==========================================================================
+  - name: cognive_infrastructure_alerts
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage (> 90%)"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage (> 85%)"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 10m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Disk space critically low (< 10%)"
+          description: "Disk space below 10% on {{ $labels.mountpoint }}"
+
+      - alert: DiskSpaceWarning
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.2
+        for: 30m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Disk space low (< 20%)"
+          description: "Disk space below 20% on {{ $labels.mountpoint }}"
+
+  # ==========================================================================
+  # Celery Task Alerts
+  # ==========================================================================
+  - name: cognive_celery_alerts
+    interval: 30s
+    rules:
+      - alert: CeleryWorkerDown
+        expr: flower_workers < 1
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "No Celery workers available"
+          description: "All Celery workers are down"
+
+      - alert: HighTaskFailureRate
+        expr: |
+          sum(rate(cognive_celery_tasks_total{status="failure"}[5m])) 
+          / 
+          sum(rate(cognive_celery_tasks_total[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High Celery task failure rate (> 10%)"
+          description: "Task failure rate is {{ $value | humanizePercentage }}"
+
+      - alert: TaskQueueBacklog
+        expr: cognive_celery_tasks_queued > 500
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Celery task queue backlog"
+          description: "{{ $value }} tasks queued in {{ $labels.queue }}"
+
+

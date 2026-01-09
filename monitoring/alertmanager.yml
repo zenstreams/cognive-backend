@@ -1,0 +1,141 @@
+# Alertmanager Configuration for Cognive Control Plane
+# Routes alerts to appropriate notification channels
+
+global:
+  # Global settings
+  resolve_timeout: 5m
+  
+  # SMTP configuration (uncomment and configure for email alerts)
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alertmanager@cognive.io'
+  # smtp_auth_username: 'your-email@gmail.com'
+  # smtp_auth_password: 'your-app-password'
+  
+  # Slack configuration (uncomment and configure)
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# Templates for notification messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Inhibition rules - prevent noisy alerts
+inhibit_rules:
+  # If APIDown is firing, suppress HighErrorRate and HighLatency
+  - source_match:
+      alertname: APIDown
+    target_match_re:
+      alertname: '(HighErrorRate|HighLatency)'
+    equal: ['instance']
+  
+  # If DatabaseDown is firing, suppress connection pool alerts
+  - source_match:
+      alertname: DatabaseDown
+    target_match:
+      alertname: DatabaseConnectionPoolHigh
+    equal: ['instance']
+  
+  # If RedisDown is firing, suppress cache alerts
+  - source_match:
+      alertname: RedisDown
+    target_match:
+      alertname: HighCacheMissRate
+
+# Routing configuration
+route:
+  # Default receiver for all alerts
+  receiver: 'default-receiver'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'team']
+  
+  # Wait before sending first notification for a new group
+  group_wait: 30s
+  
+  # Wait before sending notification about new alerts in existing group
+  group_interval: 5m
+  
+  # Wait before resending notification
+  repeat_interval: 4h
+  
+  # Child routes for specific alert routing
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+    
+    # Platform team alerts
+    - match:
+        team: platform
+      receiver: 'platform-team'
+      continue: true
+    
+    # AI Ops team alerts
+    - match:
+        team: ai-ops
+      receiver: 'ai-ops-team'
+      continue: true
+    
+    # Finance team alerts (cost/budget)
+    - match:
+        team: finance
+      receiver: 'finance-team'
+
+# Notification receivers
+receivers:
+  # Default receiver - logs alerts (development)
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://alertmanager-webhook:5001/webhook'
+        send_resolved: true
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    webhook_configs:
+      - url: 'http://alertmanager-webhook:5001/webhook/critical'
+        send_resolved: true
+    # Uncomment for Slack notifications:
+    # slack_configs:
+    #   - channel: '#alerts-critical'
+    #     send_resolved: true
+    #     title: '{{ template "slack.default.title" . }}'
+    #     text: '{{ template "slack.default.text" . }}'
+    # Uncomment for PagerDuty:
+    # pagerduty_configs:
+    #   - service_key: '<YOUR-PAGERDUTY-KEY>'
+    #     severity: critical
+
+  # Platform team receiver
+  - name: 'platform-team'
+    webhook_configs:
+      - url: 'http://alertmanager-webhook:5001/webhook/platform'
+        send_resolved: true
+    # Uncomment for Slack:
+    # slack_configs:
+    #   - channel: '#platform-alerts'
+    #     send_resolved: true
+
+  # AI Ops team receiver
+  - name: 'ai-ops-team'
+    webhook_configs:
+      - url: 'http://alertmanager-webhook:5001/webhook/ai-ops'
+        send_resolved: true
+    # Uncomment for Slack:
+    # slack_configs:
+    #   - channel: '#ai-ops-alerts'
+    #     send_resolved: true
+
+  # Finance team receiver
+  - name: 'finance-team'
+    webhook_configs:
+      - url: 'http://alertmanager-webhook:5001/webhook/finance'
+        send_resolved: true
+    # Uncomment for email:
+    # email_configs:
+    #   - to: 'finance@cognive.io'
+    #     send_resolved: true
+
+

@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     storage_sse: str | None = Field(default=None, alias="STORAGE_SSE")
     storage_sse_kms_key_id: str | None = Field(default=None, alias="STORAGE_SSE_KMS_KEY_ID")
 
+    # Monitoring & Observability
+    # GlitchTip/Sentry DSN for error tracking (self-hosted alternative to Sentry)
+    glitchtip_dsn: str | None = Field(default=None, alias="GLITCHTIP_DSN")
+    sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")  # Fallback
+
+    # Enable Prometheus metrics endpoint
+    enable_metrics: bool = Field(default=True, alias="ENABLE_METRICS")
+
+    # Application version (for release tracking in error reports)
+    app_version: str = Field(default="0.1.0", alias="APP_VERSION")
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

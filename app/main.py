@@ -15,7 +15,9 @@ from pydantic import BaseModel, Field
 
 from app.api.health import router as health_router
 from app.core.config import settings
+from app.core.error_tracking import init_error_tracking
 from app.core.messaging import setup_all_queues
+from app.core.metrics import setup_metrics
 from app.core.storage import init_storage
 
 # =============================================================================
@@ -169,6 +171,20 @@ def create_application() -> FastAPI:
             return fallback_schema
 
     app.openapi = custom_openapi
+
+    # -------------------------------------------------------------------------
+    # Prometheus Metrics Instrumentation
+    # -------------------------------------------------------------------------
+
+    if settings.enable_metrics:
+        setup_metrics(app, app_version=API_VERSION)
+        logger.info("✅ Prometheus metrics enabled at /metrics")
+
+    # -------------------------------------------------------------------------
+    # Error Tracking (GlitchTip/Sentry)
+    # -------------------------------------------------------------------------
+
+    init_error_tracking(app)
 
     # -------------------------------------------------------------------------
     # Documentation Endpoints with Caching

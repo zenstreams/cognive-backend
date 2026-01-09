@@ -1,0 +1,187 @@
+---
+# GlitchTip Secrets (use external secrets in production)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: glitchtip-secrets
+  namespace: cognive
+type: Opaque
+stringData:
+  secret-key: "change-me-in-production-use-random-string"  # CHANGE THIS!
+  database-url: "postgres://cognive:password@postgres:5432/glitchtip"  # Update credentials
+
+---
+# GlitchTip Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glitchtip
+  namespace: cognive
+  labels:
+    app: glitchtip
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glitchtip
+      component: web
+  template:
+    metadata:
+      labels:
+        app: glitchtip
+        component: web
+    spec:
+      containers:
+        - name: glitchtip
+          image: glitchtip/glitchtip:latest
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: glitchtip-secrets
+                  key: database-url
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: glitchtip-secrets
+                  key: secret-key
+            - name: PORT
+              value: "8000"
+            - name: EMAIL_URL
+              value: "consolemail://"
+            - name: GLITCHTIP_DOMAIN
+              value: "https://glitchtip.cognive.io"
+            - name: DEFAULT_FROM_EMAIL
+              value: "glitchtip@cognive.io"
+            - name: CELERY_WORKER_AUTOSCALE
+              value: "1,3"
+            - name: REDIS_URL
+              value: "redis://redis:6379/1"
+          livenessProbe:
+            httpGet:
+              path: /health/
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"
+
+---
+# GlitchTip Worker Deployment (Celery)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glitchtip-worker
+  namespace: cognive
+  labels:
+    app: glitchtip
+    component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: glitchtip
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: glitchtip
+        component: worker
+    spec:
+      containers:
+        - name: worker
+          image: glitchtip/glitchtip:latest
+          command: ["./bin/run-celery-with-beat.sh"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: glitchtip-secrets
+                  key: database-url
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: glitchtip-secrets
+                  key: secret-key
+            - name: EMAIL_URL
+              value: "consolemail://"
+            - name: GLITCHTIP_DOMAIN
+              value: "https://glitchtip.cognive.io"
+            - name: CELERY_WORKER_AUTOSCALE
+              value: "1,3"
+            - name: CELERY_WORKER_MAX_TASKS_PER_CHILD
+              value: "10000"
+            - name: REDIS_URL
+              value: "redis://redis:6379/1"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
+
+---
+# GlitchTip Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: glitchtip
+  namespace: cognive
+  labels:
+    app: glitchtip
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: glitchtip
+    component: web
+
+---
+# GlitchTip Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: glitchtip-ingress
+  namespace: cognive
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - glitchtip.cognive.io
+      secretName: glitchtip-tls-cert
+  rules:
+    - host: glitchtip.cognive.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: glitchtip
+                port:
+                  number: 8000
+
+
