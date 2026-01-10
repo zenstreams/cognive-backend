@@ -64,12 +64,6 @@ scrape_configs:
       - targets: ['minio:9000']
     metrics_path: /minio/v2/metrics/cluster
 
-  # Celery Flower (task monitoring)
-  - job_name: 'flower'
-    static_configs:
-      - targets: ['flower:5555']
-    metrics_path: /metrics
-
   # Node exporter (host metrics - optional)
   - job_name: 'node'
     static_configs:
@@ -83,9 +77,11 @@ scrape_configs:
     metrics_path: /metrics
 
   # GlitchTip (error tracking)
-  - job_name: 'glitchtip'
-    static_configs:
-      - targets: ['glitchtip:8000']
-    metrics_path: /health/metrics/
+  # Note: GlitchTip doesn't expose Prometheus metrics by default.
+  # Uncomment if you add django-prometheus to GlitchTip.
+  # - job_name: 'glitchtip'
+  #   static_configs:
+  #     - targets: ['glitchtip:8000']
+  #   metrics_path: /metrics
 
 

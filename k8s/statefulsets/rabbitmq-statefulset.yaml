@@ -23,12 +23,19 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
+          command:
+            - sh
+            - -c
+            - rabbitmq-plugins enable --offline rabbitmq_prometheus && rabbitmq-server
           ports:
             - name: amqp
               containerPort: 5672
               protocol: TCP
             - name: management
               containerPort: 15672
+              protocol: TCP
+            - name: metrics
+              containerPort: 15692
               protocol: TCP
           env:
             - name: RABBITMQ_DEFAULT_USER
@@ -102,6 +109,10 @@ spec:
       targetPort: 15672
       protocol: TCP
       name: management
+    - port: 15692
+      targetPort: 15692
+      protocol: TCP
+      name: metrics
   selector:
     app: cognive
     component: rabbitmq

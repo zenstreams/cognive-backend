@@ -308,16 +308,6 @@ groups:
   - name: cognive_celery_alerts
     interval: 30s
     rules:
-      - alert: CeleryWorkerDown
-        expr: flower_workers < 1
-        for: 2m
-        labels:
-          severity: critical
-          team: platform
-        annotations:
-          summary: "No Celery workers available"
-          description: "All Celery workers are down"
-
       - alert: HighTaskFailureRate
         expr: |
           sum(rate(cognive_celery_tasks_total{status="failure"}[5m])) 

@@ -105,7 +105,7 @@ data:
       # PostgreSQL
       - job_name: 'postgres'
         static_configs:
-          - targets: ['postgres:5432']
+          - targets: ['postgres-exporter:9187']
         metrics_path: /metrics
 
       # Redis
@@ -117,6 +117,21 @@ data:
       - job_name: 'rabbitmq'
         static_configs:
           - targets: ['rabbitmq:15692']
+
+      # Node exporter (host metrics)
+      - job_name: 'node'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - cognive
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_component]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: "9100"
 
 ---
 apiVersion: v1

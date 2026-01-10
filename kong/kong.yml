@@ -28,5 +28,11 @@ services:
           limit_by: ip
           minute: 60
           fault_tolerant: true
+      - name: prometheus
+        config:
+          status_code_metrics: true
+          latency_metrics: true
+          bandwidth_metrics: true
+          upstream_health_metrics: true
 
 

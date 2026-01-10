@@ -27,7 +27,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
+      - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
@@ -167,7 +167,9 @@ services:
       - postgres
       - redis
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/health/"]
+      # Note: glitchtip/glitchtip image doesn't include wget/curl. Use python stdlib instead.
+      # GlitchTip exposes `/_health/` (whereas `/health/` may not exist depending on version/config).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/_health/')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -177,7 +179,13 @@ services:
     image: glitchtip/glitchtip:latest
     container_name: cognive-glitchtip-worker
     restart: unless-stopped
-    command: ./bin/run-celery-with-beat.sh
+    # Workaround: Celery beat schedule persistence on /tmp can fail with sqlite "locking protocol" on some Docker Desktop setups.
+    # Store the beat schedule in /dev/shm (tmpfs) instead.
+    command: >
+      sh -lc "
+      rm -f /tmp/celerybeat-schedule* /dev/shm/celerybeat-schedule* || true;
+      exec celery -A glitchtip worker -l info -B -s /dev/shm/celerybeat-schedule
+      "
     environment:
       - DATABASE_URL=postgres://${POSTGRES_USER:-cognive}:${POSTGRES_PASSWORD:-password}@postgres:5432/glitchtip
       - SECRET_KEY=${GLITCHTIP_SECRET_KEY:-change-me-in-production}

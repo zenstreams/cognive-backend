@@ -9,6 +9,8 @@ This module provides:
 """
 
 import logging
+import re
+import time
 from typing import Callable
 
 from fastapi import FastAPI
@@ -101,6 +103,20 @@ TOOL_INVOCATION_DURATION = Histogram(
 # =============================================================================
 # Infrastructure Metrics
 # =============================================================================
+
+# Core HTTP metrics used by alert rules
+HTTP_REQUESTS_TOTAL = Counter(
+    "cognive_http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+)
+
+HTTP_REQUEST_DURATION = Histogram(
+    "cognive_http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["method", "path"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10),
+)
 
 # Database Metrics
 DB_CONNECTIONS_ACTIVE = Gauge(
@@ -271,7 +287,62 @@ def setup_metrics(app: FastAPI, app_version: str = "0.1.0") -> Instrumentator:
         inprogress_labels=True,
     )
 
+    def _normalize_path(path: str) -> str:
+        # Replace UUIDs and numeric IDs with placeholders to avoid high cardinality.
+        path = re.sub(
+            r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            "/{uuid}",
+            path,
+        )
+        path = re.sub(r"/\d+", "/{id}", path)
+        return path
+
+    @app.middleware("http")
+    async def cognive_http_metrics_middleware(request, call_next):
+        # Keep these metrics stable & low-cardinality for alerting.
+        if request.url.path in {"/metrics", "/health"} or request.url.path.startswith("/api/v1/health"):
+            return await call_next(request)
+
+        start = time.perf_counter()
+        status_code = "0"
+        try:
+            response = await call_next(request)
+            status_code = str(response.status_code)
+            return response
+        except Exception:
+            # Let FastAPI handle/format the 500, but record it.
+            status_code = "500"
+            raise
+        finally:
+            duration = time.perf_counter() - start
+            path = _normalize_path(request.url.path)
+            HTTP_REQUESTS_TOTAL.labels(
+                method=request.method,
+                path=path,
+                status=status_code,
+            ).inc()
+            HTTP_REQUEST_DURATION.labels(
+                method=request.method,
+                path=path,
+            ).observe(duration)
+
     # Add custom metrics
+    # These match the names used in alert rules.
+    instrumentator.add(
+        metrics.requests(
+            metric_name="cognive_http_requests_by_handler_total",
+            should_include_handler=True,
+            should_include_method=True,
+            should_include_status=True,
+        )
+    )
+    instrumentator.add(
+        metrics.latency(
+            metric_name="cognive_http_request_duration_by_handler_seconds",
+            should_include_handler=True,
+            should_include_method=True,
+        )
+    )
     instrumentator.add(http_requests_by_path())
     instrumentator.add(response_size())
 
