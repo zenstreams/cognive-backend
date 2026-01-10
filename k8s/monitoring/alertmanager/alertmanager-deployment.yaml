@@ -11,6 +11,11 @@ data:
   alertmanager.yml: |
     global:
       resolve_timeout: 5m
+      smtp_smarthost: '${SMTP_SMARTHOST:-smtp.example.com:587}'
+      smtp_from: '${SMTP_FROM:-alerts@example.com}'
+      smtp_auth_username: '${SMTP_USERNAME:-}'
+      smtp_auth_password: '${SMTP_PASSWORD:-}'
+      smtp_require_tls: true
 
     inhibit_rules:
       - source_match:
@@ -59,10 +64,16 @@ data:
         webhook_configs:
           - url: 'http://alertmanager-webhook:5001/webhook'
             send_resolved: true
+        email_configs:
+          - to: '${ALERT_EMAIL_TO:-alerts@example.com}'
+            send_resolved: true
 
       - name: 'critical-alerts'
         webhook_configs:
           - url: 'http://alertmanager-webhook:5001/webhook/critical'
+            send_resolved: true
+        email_configs:
+          - to: '${ALERT_EMAIL_TO_CRITICAL:-alerts@example.com}'
             send_resolved: true
 
       - name: 'platform-team'

@@ -4,6 +4,12 @@
 global:
   # Global settings
   resolve_timeout: 5m
+  # Email SMTP (configure via env; defaults to local MailHog)
+  smtp_smarthost: '${SMTP_SMARTHOST:-mailhog:1025}'
+  smtp_from: '${SMTP_FROM:-alerts@local.test}'
+  smtp_auth_username: '${SMTP_USERNAME:-}'
+  smtp_auth_password: '${SMTP_PASSWORD:-}'
+  smtp_require_tls: true
   
   # SMTP configuration (uncomment and configure for email alerts)
   # smtp_smarthost: 'smtp.gmail.com:587'
@@ -91,11 +97,17 @@ receivers:
     webhook_configs:
       - url: 'http://alertmanager-webhook:5001/webhook'
         send_resolved: true
+    email_configs:
+      - to: '${ALERT_EMAIL_TO:-alerts@example.com}'
+        send_resolved: true
 
   # Critical alerts - multiple channels
   - name: 'critical-alerts'
     webhook_configs:
       - url: 'http://alertmanager-webhook:5001/webhook/critical'
+        send_resolved: true
+    email_configs:
+      - to: '${ALERT_EMAIL_TO_CRITICAL:-alerts@example.com}'
         send_resolved: true
     # Uncomment for Slack notifications:
     # slack_configs:

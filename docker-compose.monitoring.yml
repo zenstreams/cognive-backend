@@ -222,6 +222,17 @@ services:
   # ==========================================================================
   # Exporters - Infrastructure Metrics
   # ==========================================================================
+
+  # MailHog - Local SMTP sink for Alertmanager email testing
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: cognive-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - cognive-network
   
   # Node Exporter - Host metrics (CPU, Memory, Disk, Network)
   node-exporter:
